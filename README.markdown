@@ -1,10 +1,10 @@
-Hyperparser - Lua HTTP parser (based on http://github.com/ry/http-parser)
+Hyperparser - Lua HTTP parser (based on [http-parser](http://github.com/ry/http-parser))
 
 It runs on *BSD and Linux. Windows was not tested.
 
 ### Requirements
 
-- Premake - used for Makefile generation ([premake](http://industriousone.com/premake))
+- [Premake](http://industriousone.com/premake) - used for Makefile generation
 
 ### Compilation
 
@@ -17,7 +17,7 @@ The library follows behavior from http-parser C library.
 	require "hyperparser"
 	
 	local parser = hyperparser.new("request") -- or hyperparser.new("response")
-	local req = "GET /index/?key=val&key2=val2 HTTP/1.1\r\nHost: www.example.com\r\nContent-Length: 9\r\n\r\nmeta=dane"
+	local req = "GET /index/?key=val&key2=val2 HTTP/1.1\r\nHost: www.example.com\r\nContent-Length: 9\r\n\r\n"
 	local settings = {
         msgcomplete = function()
             print("Message completed.")
