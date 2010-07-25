@@ -18,6 +18,7 @@ The library follows behavior from http-parser C library.
 	
 	local parser = hyperparser.new("request") -- or hyperparser.new("response")
 	local req = "GET /index/?key=val&key2=val2 HTTP/1.1\r\nHost: www.example.com\r\nContent-Length: 9\r\n\r\n"
+	
 	local settings = {
         msgcomplete = function()
             print("Message completed.")
@@ -32,5 +33,5 @@ The library follows behavior from http-parser C library.
 		end
 	}
 	
-	parser:execute(settings, req, #req+1)
+	parser:execute(settings, req)
 

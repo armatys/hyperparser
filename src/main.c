@@ -54,7 +54,7 @@ static const char* getHttpMethodEnum(int method) {
 
 static void pushCallbacks(lua_State* L) {
     lua_getfield(L, LUA_ENVIRONINDEX, "__callbacks");
-    lua_remove(L, lua_gettop(L)-1);
+    //lua_remove(L, lua_gettop(L)-1);
 }
 
 static int l_parsertostring(lua_State* L) {
@@ -162,12 +162,8 @@ static int l_body(http_parser* p, const char *at, size_t length) {
 static int l_execute(lua_State* L) {
     http_parser* p = (http_parser*)luaL_checkudata(L, 1, "hyperparser.parser");
     luaL_checktype(L, 2, LUA_TTABLE);
-    const char *data = luaL_checkstring(L, 3);
     size_t len = 0;
-    
-    if (!lua_isnoneornil(L, 4)) {
-        len = luaL_checknumber(L, 4);
-    }
+    const char *data = luaL_checklstring(L, 3, &len);
     
     pushCallbacks(L);
     lua_pushlightuserdata(L, p);
