@@ -25,8 +25,8 @@
 #include "http_parser.h"
 
 static int getRequestTypeFlags(lua_State* L, const char* name) {
-    if (strncmp(name, "request", 4) == 0) return HTTP_REQUEST;
-    if (strncmp(name, "response", 4) == 0) return HTTP_RESPONSE;
+    if (strncmp(name, "request", 8) == 0) return HTTP_REQUEST;
+    if (strncmp(name, "response", 9) == 0) return HTTP_RESPONSE;
     
     return luaL_error(L, "Invalid flag.");
 }
@@ -54,7 +54,6 @@ static const char* getHttpMethodEnum(int method) {
 
 static void pushCallbacks(lua_State* L) {
     lua_getfield(L, LUA_ENVIRONINDEX, "__callbacks");
-    //lua_remove(L, lua_gettop(L)-1);
 }
 
 static int l_parsertostring(lua_State* L) {
@@ -72,7 +71,7 @@ static int l_create(lua_State* L) {
     
     http_parser* p = lua_newuserdata(L, sizeof(http_parser));
     http_parser_init(p, type);
-    p->data = L; //Associate Lua state with parser
+    p->data = L; /* Associate Lua state with parser */
     
     luaL_getmetatable(L, "hyperparser.parser");
     lua_setmetatable(L, -2);
@@ -168,8 +167,8 @@ static int l_execute(lua_State* L) {
     pushCallbacks(L);
     lua_pushlightuserdata(L, p);
     lua_pushvalue(L, 2);
-    /* Sets a new table like: hyperparser.__callbacks[*p] = {}
-       In this table I will hold callbacks for parser p. */
+    /* Sets a new table like: __callbacks[*p] = {}
+       In this table I will put callbacks for parser p. */
     lua_settable(L, -3);
     
     struct http_parser_settings settings;
@@ -186,7 +185,7 @@ static int l_execute(lua_State* L) {
     
     lua_pushnil(L);
     while(lua_next(L, 2) != 0) {
-        lua_pop(L, 1); //pops value
+        lua_pop(L, 1); /* pops value */
         const char* key = lua_tostring(L, -1);
         
         if (strncmp(key, "msgbegin", 9) == 0)
@@ -213,13 +212,13 @@ static int l_execute(lua_State* L) {
             return luaL_error(L, "Callback '%s' is not available (mispelled name?)", key);
     }
     
-    ssize_t nparsed = http_parser_execute(p, settings, data, len);
+    ssize_t nparsed = http_parser_execute(p, &settings, data, len);
     lua_pushnumber(L, nparsed);
     
     return 1;
 }
 
-//========== Hyperparser Attributes ================
+/*========== Hyperparser Attributes ================*/
 static int l_upgrade_a(lua_State* L) {
     http_parser* p = (http_parser*)luaL_checkudata(L, 1, "hyperparser.parser");
     if (p->upgrade)
@@ -272,7 +271,7 @@ static int l_nread_a(lua_State* L) {
     return 1;
 }
 
-static int l_bodyread_a(lua_State* L) {
+/*static int l_bodyread_a(lua_State* L) {
     http_parser* p = (http_parser*)luaL_checkudata(L, 1, "hyperparser.parser");
     lua_pushinteger(L, p->body_read);
     
@@ -314,6 +313,7 @@ static int l_fragment_a(lua_State* L) {
     http_parser* p = (http_parser*)luaL_checkudata(L, 1, "hyperparser.parser");
     return l_pushstrparam(L, p->fragment_mark, p->fragment_size);
 }
+*/
 
 static int l_parsergc(lua_State* L) {
     http_parser* p = (http_parser*)luaL_checkudata(L, 1, "hyperparser.parser");
@@ -341,14 +341,7 @@ static const struct luaL_Reg hyperlib_m [] = {
     {"httpmajor", l_httpmajor_a},
     {"httpminor", l_httpminor_a},
     {"contentlength", l_contentlength_a},
-    {"bodyread", l_bodyread_a},
     {"nread", l_nread_a},
-    {"headerfield", l_headerfield_a},
-    {"headervalue", l_headervalue_a},
-    {"querystring", l_querystring_a},
-    {"path", l_path_a},
-    {"url", l_url_a},
-    {"fragment", l_fragment_a},
     {NULL, NULL}
 };
 
@@ -373,11 +366,6 @@ LUALIB_API int luaopen_hyperparser(lua_State* L) {
     luaL_register(L, NULL, hyperlib_m);
 
     luaL_register(L, "hyperparser", hyperlib);
-    
-    /*lua_newtable(L);
-    lua_pushstring(L, "kv");
-    lua_setfield(L, -2, "__mode");
-    lua_setmetatable(L, -2);*/
     
     return 1;
 }

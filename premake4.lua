@@ -1,6 +1,7 @@
 solution "hyperparser"
     configurations { "release" }
     flags { "ExtraWarnings", "NoFramePointer", "OptimizeSpeed" }
+    buildoptions { "-ansi" }
     platforms { "native", "x32", "x64" }
 
 project "hyperparser"
