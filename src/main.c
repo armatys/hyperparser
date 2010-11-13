@@ -271,50 +271,6 @@ static int l_nread_a(lua_State* L) {
     return 1;
 }
 
-/*static int l_bodyread_a(lua_State* L) {
-    http_parser* p = (http_parser*)luaL_checkudata(L, 1, "hyperparser.parser");
-    lua_pushinteger(L, p->body_read);
-    
-    return 1;
-}
-
-static int l_pushstrparam(lua_State* L, const char* s, ssize_t len) {
-    lua_pushlstring(L, s, len);
-    
-    return 1;
-}
-
-static int l_headerfield_a(lua_State* L) {
-    http_parser* p = (http_parser*)luaL_checkudata(L, 1, "hyperparser.parser");
-    return l_pushstrparam(L, p->header_field_mark, p->header_field_size);
-}
-
-static int l_headervalue_a(lua_State* L) {
-    http_parser* p = (http_parser*)luaL_checkudata(L, 1, "hyperparser.parser");
-    return l_pushstrparam(L, p->header_value_mark, p->header_value_size);
-}
-
-static int l_querystring_a(lua_State* L) {
-    http_parser* p = (http_parser*)luaL_checkudata(L, 1, "hyperparser.parser");
-    return l_pushstrparam(L, p->query_string_mark, p->query_string_size);
-}
-
-static int l_path_a(lua_State* L) {
-    http_parser* p = (http_parser*)luaL_checkudata(L, 1, "hyperparser.parser");
-    return l_pushstrparam(L, p->path_mark, p->path_size);
-}
-
-static int l_url_a(lua_State* L) {
-    http_parser* p = (http_parser*)luaL_checkudata(L, 1, "hyperparser.parser");
-    return l_pushstrparam(L, p->url_mark, p->url_size);
-}
-
-static int l_fragment_a(lua_State* L) {
-    http_parser* p = (http_parser*)luaL_checkudata(L, 1, "hyperparser.parser");
-    return l_pushstrparam(L, p->fragment_mark, p->fragment_size);
-}
-*/
-
 static int l_parsergc(lua_State* L) {
     http_parser* p = (http_parser*)luaL_checkudata(L, 1, "hyperparser.parser");
     
