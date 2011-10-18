@@ -130,20 +130,8 @@ static int l_msgcomplete(http_parser* p) {
     return l_http_cb(p, "msgcomplete");
 }
 
-static int l_path(http_parser* p, const char *at, size_t length) {
-    return l_http_data_cb(p, at, length, "path");
-}
-
-static int l_querystring(http_parser* p, const char *at, size_t length) {
-    return l_http_data_cb(p, at, length, "querystring");
-}
-
 static int l_url(http_parser* p, const char *at, size_t length) {
     return l_http_data_cb(p, at, length, "url");
-}
-
-static int l_fragment(http_parser* p, const char *at, size_t length) {
-    return l_http_data_cb(p, at, length, "fragment");
 }
 
 static int l_headerfield(http_parser* p, const char *at, size_t length) {
@@ -173,10 +161,7 @@ static int l_execute(lua_State* L) {
     
     struct http_parser_settings settings;
     settings.on_message_begin = NULL;
-    settings.on_path = NULL;
-    settings.on_query_string = NULL;
     settings.on_url = NULL;
-    settings.on_fragment = NULL;
     settings.on_header_field = NULL;
     settings.on_header_value = NULL;
     settings.on_headers_complete = NULL;
@@ -190,14 +175,8 @@ static int l_execute(lua_State* L) {
         
         if (strncmp(key, "msgbegin", 9) == 0)
             settings.on_message_begin = l_msgbegin;
-        else if (strncmp(key, "path", 5) == 0)
-            settings.on_path = l_path;
-        else if (strncmp(key, "querystring", 12) == 0)
-            settings.on_query_string = l_querystring;
         else if (strncmp(key, "url", 4) == 0)
             settings.on_url = l_url;
-        else if (strncmp(key, "fragment", 9) == 0)
-            settings.on_fragment = l_fragment;
         else if (strncmp(key, "headerfield", 12) == 0)
             settings.on_header_field = l_headerfield;
         else if (strncmp(key, "headervalue", 12) == 0)
@@ -209,7 +188,7 @@ static int l_execute(lua_State* L) {
         else if (strncmp(key, "msgcomplete", 12) == 0)
             settings.on_message_complete = l_msgcomplete;
         else
-            return luaL_error(L, "Callback '%s' is not available (mispelled name?)", key);
+            return luaL_error(L, "Callback '%s' is not available (misspelled name?)", key);
     }
     
     ssize_t nparsed = http_parser_execute(p, &settings, data, len);
