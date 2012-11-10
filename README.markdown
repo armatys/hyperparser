@@ -1,14 +1,12 @@
-Hyperparser - Lua HTTP parser (based on [http-parser](http://github.com/ry/http-parser))
+Hyperparser - Lua HTTP parser (based on [http-parser](https://github.com/joyent/http-parser))
 
 It runs on *BSD and Linux. Windows was not tested.
 
-### Requirements
-
-- [Premake](http://industriousone.com/premake) - used for Makefile generation
-
 ### Compilation
 
-Use [premake](http://industriousone.com/premake) to generate appropriate build files. E.g run `premake4 gmake` to generate a Makefile. Then execute `make config=release32` or `make config=release64` to compile.
+Use luarocks to compile and install:
+
+    $ [sudo] luarocks make
 
 ### Usage:
 
