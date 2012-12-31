@@ -136,6 +136,10 @@ static int l_msgbegin(http_parser* p) {
   return l_http_cb(p, "msgbegin");
 }
 
+static int l_statuscomplete(http_parser* p) {
+  return l_http_cb(p, "statuscomplete");
+}
+
 static int l_headerscomplete(http_parser* p) {
   return l_http_cb(p, "headerscomplete");
 }
@@ -179,6 +183,7 @@ static int l_create(lua_State* L, int type) {
   // Parse settings callbacks
   struct http_parser_settings* settings = (struct http_parser_settings*) malloc(sizeof(struct http_parser_settings));
   settings->on_message_begin = NULL;
+  settings->on_status_complete = NULL;
   settings->on_url = NULL;
   settings->on_header_field = NULL;
   settings->on_header_value = NULL;
@@ -205,6 +210,8 @@ static int l_create(lua_State* L, int type) {
       settings->on_body = l_body;
     else if (strncmp(key, "msgcomplete", 12) == 0)
       settings->on_message_complete = l_msgcomplete;
+    else if (strncmp(key, "statuscomplete", 15) == 0)
+      settings->on_status_complete = l_statuscomplete;
     else
       return luaL_error(L, "Callback '%s' is not available (misspelled name?)", key);
   }
