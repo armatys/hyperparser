@@ -292,6 +292,13 @@ static int l_nread_a(lua_State* L) {
   return 1;
 }
 
+static int l_shouldkeepalive_a(lua_State* L) {
+  http_parser* p = (http_parser*)luaL_checkudata(L, 1, "hyperparser.parser");
+  int shouldKeepAlive = http_should_keep_alive(p);
+  lua_pushboolean(L, shouldKeepAlive);
+  return 1;
+}
+
 static int l_parsergc(lua_State* L) {
   http_parser* p = (http_parser*)luaL_checkudata(L, 1, "hyperparser.parser");
   parser_context* ctx = (parser_context*) p->data;
@@ -321,6 +328,7 @@ static const struct luaL_Reg hyperlib_m [] = {
   {"httpminor", l_httpminor_a},
   {"contentlength", l_contentlength_a},
   {"nread", l_nread_a},
+  {"shouldkeepalive", l_shouldkeepalive_a},
   {NULL, NULL}
 };
 
