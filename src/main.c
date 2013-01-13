@@ -25,7 +25,9 @@
 #include <stdlib.h>
 #include "http_parser.h"
 
-static int hasPerun = 0;
+static const char* ParserUDataName = "hyperparser.parser";
+static const char* UrlParserUdataName = "hyperparser.urlparser";
+static const char* HyperParserCallbacksName = "__hyperparser_callbacks";
 
 typedef struct parser_context {
   lua_State* L;
@@ -61,11 +63,11 @@ static const char* getHttpMethodEnum(int method) {
 }
 
 static void pushCallbacks(lua_State* L) {
-  lua_getfield(L, LUA_ENVIRONINDEX, "__callbacks");
+  lua_getfield(L, LUA_ENVIRONINDEX, HyperParserCallbacksName);
 }
 
 static int l_parsertostring(lua_State* L) {
-  http_parser* p = (http_parser*)luaL_checkudata(L, 1, "hyperparser.parser");
+  http_parser* p = (http_parser*)luaL_checkudata(L, 1, ParserUDataName);
   if (p->type == 0)
     lua_pushfstring(L, "<hyperparser request>");
   else
@@ -87,21 +89,8 @@ static int l_http_data_cb(http_parser* p, const char *at, size_t length, const c
 
   if (! lua_isnoneornil(L, -1)) {
     luaL_checktype(L, -1, LUA_TFUNCTION);
-
-    int threadType = lua_pushthread(L);
-    lua_pop(L, 1);
-
-    if (threadType != 1 && hasPerun) {
-      // Run the callback using perun.spawn
-      luaL_dostring(L, "return require 'perun'");
-      lua_getfield(L, -1, "spawn");
-      lua_pushvalue(L, -3); // push the callback
-      lua_pushlstring(L, at, length);
-      lua_call(L, 2, 0);
-    } else {
-      lua_pushlstring(L, at, length);
-      lua_call(L, 1, 0);
-    }
+    lua_pushlstring(L, at, length);
+    lua_call(L, 1, 0);
   }
 
   return 0;
@@ -114,19 +103,7 @@ static int l_http_cb(http_parser* p, const char* type) {
   
   if (! lua_isnoneornil(L, -1)) {
     luaL_checktype(L, -1, LUA_TFUNCTION);
-
-    int threadType = lua_pushthread(L);
-    lua_pop(L, 1);
-
-    if (threadType != 1 && hasPerun) {
-      // Run the callback using perun.spawn
-      luaL_dostring(L, "return require 'perun'");
-      lua_getfield(L, -1, "spawn");
-      lua_pushvalue(L, -3); // push the callback
-      lua_call(L, 1, 0);
-    } else {
-      lua_call(L, 0, 0);
-    }
+    lua_call(L, 0, 0);
   }
   
   return 0;
@@ -170,14 +147,14 @@ static int l_create(lua_State* L, int type) {
   // Create http_parser
   http_parser* p = lua_newuserdata(L, sizeof(http_parser));
   http_parser_init(p, type);
-  luaL_getmetatable(L, "hyperparser.parser");
+  luaL_getmetatable(L, ParserUDataName);
   lua_setmetatable(L, -2);
 
-  // store settings in __callbacks[*p]
+  // store settings in HyperParserCallbacksName[*p]
   pushCallbacks(L);
   lua_pushlightuserdata(L, p); // push key
   lua_pushvalue(L, 1); // push settings table - value
-  lua_settable(L, -3); // set the field of __callbacks table
+  lua_settable(L, -3); // set the field of HyperParserCallbacksName table
   lua_pop(L, 1); // pop the callbacks table
   
   // Parse settings callbacks
@@ -234,7 +211,7 @@ static int l_create_response(lua_State* L) {
 }
 
 static int l_execute(lua_State* L) {
-  http_parser* p = (http_parser*)luaL_checkudata(L, 1, "hyperparser.parser");
+  http_parser* p = (http_parser*)luaL_checkudata(L, 1, ParserUDataName);
   size_t len = 0;
   const char *data = luaL_checklstring(L, 2, &len);
   parser_context* ctx = (parser_context*) p->data;
@@ -247,7 +224,7 @@ static int l_execute(lua_State* L) {
 
 /*========== Hyperparser Attributes ================*/
 static int l_upgrade_a(lua_State* L) {
-  http_parser* p = (http_parser*)luaL_checkudata(L, 1, "hyperparser.parser");
+  http_parser* p = (http_parser*)luaL_checkudata(L, 1, ParserUDataName);
   if (p->upgrade)
     lua_pushboolean(L, 1);
   else
@@ -257,50 +234,50 @@ static int l_upgrade_a(lua_State* L) {
 }
 
 static int l_statuscode_a(lua_State* L) {
-  http_parser* p = (http_parser*)luaL_checkudata(L, 1, "hyperparser.parser");
+  http_parser* p = (http_parser*)luaL_checkudata(L, 1, ParserUDataName);
   lua_pushinteger(L, p->status_code);
   return 1;
 }
 
 static int l_httpmajor_a(lua_State* L) {
-  http_parser* p = (http_parser*)luaL_checkudata(L, 1, "hyperparser.parser");
+  http_parser* p = (http_parser*)luaL_checkudata(L, 1, ParserUDataName);
   lua_pushinteger(L, p->http_major);
   return 1;
 }
 
 static int l_method_a(lua_State* L) {
-  http_parser* p = (http_parser*)luaL_checkudata(L, 1, "hyperparser.parser");
+  http_parser* p = (http_parser*)luaL_checkudata(L, 1, ParserUDataName);
   lua_pushstring(L, getHttpMethodEnum(p->method));
   return 1;
 }
 
 static int l_httpminor_a(lua_State* L) {
-  http_parser* p = (http_parser*)luaL_checkudata(L, 1, "hyperparser.parser");
+  http_parser* p = (http_parser*)luaL_checkudata(L, 1, ParserUDataName);
   lua_pushinteger(L, p->http_minor);
   return 1;
 }
 
 static int l_contentlength_a(lua_State* L) {
-  http_parser* p = (http_parser*)luaL_checkudata(L, 1, "hyperparser.parser");
+  http_parser* p = (http_parser*)luaL_checkudata(L, 1, ParserUDataName);
   lua_pushinteger(L, p->content_length);
   return 1;
 }
 
 static int l_nread_a(lua_State* L) {
-  http_parser* p = (http_parser*)luaL_checkudata(L, 1, "hyperparser.parser");
+  http_parser* p = (http_parser*)luaL_checkudata(L, 1, ParserUDataName);
   lua_pushinteger(L, p->nread);
   return 1;
 }
 
 static int l_shouldkeepalive_a(lua_State* L) {
-  http_parser* p = (http_parser*)luaL_checkudata(L, 1, "hyperparser.parser");
+  http_parser* p = (http_parser*)luaL_checkudata(L, 1, ParserUDataName);
   int shouldKeepAlive = http_should_keep_alive(p);
   lua_pushboolean(L, shouldKeepAlive);
   return 1;
 }
 
 static int l_parsergc(lua_State* L) {
-  http_parser* p = (http_parser*)luaL_checkudata(L, 1, "hyperparser.parser");
+  http_parser* p = (http_parser*)luaL_checkudata(L, 1, ParserUDataName);
   parser_context* ctx = (parser_context*) p->data;
   free(ctx->settings);
   free(ctx);
@@ -311,9 +288,73 @@ static int l_parsergc(lua_State* L) {
   return 0;
 }
 
+static int l_parse_url(lua_State* L) {
+  size_t len = 0;
+  const char* buf = luaL_checklstring(L, 1, &len);
+  int isconnect = 0;
+  if (lua_isboolean(L, 2)) {
+    isconnect = lua_toboolean(L, 2);
+  }
+  // TODO http_parser_url stores offsets with regard to the passed string
+  // so the string should be stored somewhere?
+  // or return a table with components
+  // or multiple results
+  struct http_parser_url* u = lua_newuserdata(L, sizeof(struct http_parser_url));
+  luaL_getmetatable(L, UrlParserUdataName);
+  lua_setmetatable(L, -2);
+  http_parser_parse_url(buf, len, isconnect, u);
+  return 1;
+}
+
+static int l_url_property(lua_State* L, enum http_parser_url_fields field) {
+  struct http_parser_url* u = (struct http_parser_url*)luaL_checkudata(L, 1, UrlParserUdataName);
+  if (u->field_set && (1 << field)) {
+    //const char* str = (const char*) (intptr_t) u->field_data[field].off;
+    //lua_pushlstring(L, str, u->field_data[field].len);
+  } else {
+    lua_pushnil(L);
+  }
+  return 1;
+}
+
+static int l_url_schema(lua_State* L) {
+  return l_url_property(L, UF_SCHEMA);
+}
+
+static int l_url_host(lua_State* L) {
+  return l_url_property(L, UF_HOST);
+}
+
+static int l_url_port(lua_State* L) {
+  struct http_parser_url* u = (struct http_parser_url*)luaL_checkudata(L, 1, UrlParserUdataName);
+  if (u->field_set && (1 << UF_PORT)) {
+    lua_pushnumber(L, u->port);
+  } else {
+    lua_pushnil(L);
+  }
+  return 1;
+}
+
+static int l_url_path(lua_State* L) {
+  return l_url_property(L, UF_PATH);
+}
+
+static int l_url_query(lua_State* L) {
+  return l_url_property(L, UF_QUERY);
+}
+
+static int l_url_fragment(lua_State* L) {
+  return l_url_property(L, UF_FRAGMENT);
+}
+
+static int l_url_userinfo(lua_State* L) {
+  return l_url_property(L, UF_USERINFO);
+}
+
 static const struct luaL_Reg hyperlib [] = {
   {"request", l_create_request},
   {"response", l_create_response},
+  {"parseurl", l_parse_url},
   {NULL, NULL}
 };
 
@@ -332,19 +373,29 @@ static const struct luaL_Reg hyperlib_m [] = {
   {NULL, NULL}
 };
 
+static const struct luaL_Reg urlparser_m [] = {
+  {"schema", l_url_schema},
+  {"host", l_url_host},
+  {"port", l_url_port},
+  {"path", l_url_path},
+  {"query", l_url_query},
+  {"fragment", l_url_fragment},
+  {"userinfo", l_url_userinfo},
+  {NULL, NULL}
+};
+
 
 /**
  * Register functions to lua_State.
  */
 LUALIB_API int luaopen_hyperparser(lua_State* L) {
-  hasPerun = luaL_dostring(L, "require 'perun'") == 0 ? 1 : 0;
-
   lua_newtable(L);
   lua_newtable(L);
-  lua_setfield(L, -2, "__callbacks");
+  lua_setfield(L, -2, HyperParserCallbacksName);
   lua_replace(L, LUA_ENVIRONINDEX);
   
-  luaL_newmetatable(L, "hyperparser.parser");
+  /* Metatable for http parser */
+  luaL_newmetatable(L, ParserUDataName);
 
   lua_pushstring(L, "__mode");
   lua_pushstring(L, "k");
@@ -358,6 +409,13 @@ LUALIB_API int luaopen_hyperparser(lua_State* L) {
   lua_setfield(L, -2, "__index");
   luaL_register(L, NULL, hyperlib_m);
 
+  /* Metatable for url parser */
+  luaL_newmetatable(L, UrlParserUdataName);
+  lua_pushvalue(L, -1);
+  lua_setfield(L, -2, "__index");
+  luaL_register(L, NULL, urlparser_m);
+
+  /* Main functions */
   lua_newtable(L);
   luaL_register(L, NULL, hyperlib);
   
