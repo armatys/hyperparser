@@ -26,7 +26,6 @@
 #include "http_parser.h"
 
 static const char* ParserUDataName = "hyperparser.parser";
-static const char* UrlParserUdataName = "hyperparser.urlparser";
 static const char* HyperParserCallbacksName = "__hyperparser_callbacks";
 
 typedef struct parser_context {
@@ -288,6 +287,21 @@ static int l_parsergc(lua_State* L) {
   return 0;
 }
 
+#define hasField(u, field) ((u)->field_set && (1 << (field)))
+
+inline int checkField(lua_State *L, const char* url, const struct http_parser_url *u, enum http_parser_url_fields field) {
+  if (hasField(u, field)) {
+    const uint16_t offset = u->field_data[field].off;
+    const uint16_t len = u->field_data[field].len;
+    const char* s = url + offset;
+    if (len > 0) {
+      lua_pushlstring(L, s, len);
+      return 1;
+    }
+  }
+  return 0;
+}
+
 static int l_parse_url(lua_State* L) {
   size_t len = 0;
   const char* buf = luaL_checklstring(L, 1, &len);
@@ -295,60 +309,43 @@ static int l_parse_url(lua_State* L) {
   if (lua_isboolean(L, 2)) {
     isconnect = lua_toboolean(L, 2);
   }
-  // TODO http_parser_url stores offsets with regard to the passed string
-  // so the string should be stored somewhere?
-  // or return a table with components
-  // or multiple results
-  struct http_parser_url* u = lua_newuserdata(L, sizeof(struct http_parser_url));
-  luaL_getmetatable(L, UrlParserUdataName);
-  lua_setmetatable(L, -2);
-  http_parser_parse_url(buf, len, isconnect, u);
-  return 1;
-}
 
-static int l_url_property(lua_State* L, enum http_parser_url_fields field) {
-  struct http_parser_url* u = (struct http_parser_url*)luaL_checkudata(L, 1, UrlParserUdataName);
-  if (u->field_set && (1 << field)) {
-    //const char* str = (const char*) (intptr_t) u->field_data[field].off;
-    //lua_pushlstring(L, str, u->field_data[field].len);
-  } else {
-    lua_pushnil(L);
+  lua_settop(L, 0);
+
+  struct http_parser_url u;
+  http_parser_parse_url(buf, len, isconnect, &u);
+  lua_newtable(L);
+
+  if (hasField(&u, UF_PORT) && u.port) {
+    lua_pushnumber(L, u.port);
+    lua_setfield(L, 1, "port");
   }
-  return 1;
-}
 
-static int l_url_schema(lua_State* L) {
-  return l_url_property(L, UF_SCHEMA);
-}
-
-static int l_url_host(lua_State* L) {
-  return l_url_property(L, UF_HOST);
-}
-
-static int l_url_port(lua_State* L) {
-  struct http_parser_url* u = (struct http_parser_url*)luaL_checkudata(L, 1, UrlParserUdataName);
-  if (u->field_set && (1 << UF_PORT)) {
-    lua_pushnumber(L, u->port);
-  } else {
-    lua_pushnil(L);
+  if (checkField(L, buf, &u, UF_SCHEMA)) {
+    lua_setfield(L, 1, "schema");
   }
+
+  if (checkField(L, buf, &u, UF_HOST)) {
+    lua_setfield(L, 1, "host");
+  }
+
+  if (checkField(L, buf, &u, UF_PATH)) {
+    lua_setfield(L, 1, "path");
+  }
+
+  if (checkField(L, buf, &u, UF_QUERY)) {
+    lua_setfield(L, 1, "query");
+  }
+
+  if (checkField(L, buf, &u, UF_FRAGMENT)) {
+    lua_setfield(L, 1, "fragment");
+  }
+
+  if (checkField(L, buf, &u, UF_USERINFO)) {
+    lua_setfield(L, 1, "userinfo");
+  }
+
   return 1;
-}
-
-static int l_url_path(lua_State* L) {
-  return l_url_property(L, UF_PATH);
-}
-
-static int l_url_query(lua_State* L) {
-  return l_url_property(L, UF_QUERY);
-}
-
-static int l_url_fragment(lua_State* L) {
-  return l_url_property(L, UF_FRAGMENT);
-}
-
-static int l_url_userinfo(lua_State* L) {
-  return l_url_property(L, UF_USERINFO);
 }
 
 static const struct luaL_Reg hyperlib [] = {
@@ -373,18 +370,6 @@ static const struct luaL_Reg hyperlib_m [] = {
   {NULL, NULL}
 };
 
-static const struct luaL_Reg urlparser_m [] = {
-  {"schema", l_url_schema},
-  {"host", l_url_host},
-  {"port", l_url_port},
-  {"path", l_url_path},
-  {"query", l_url_query},
-  {"fragment", l_url_fragment},
-  {"userinfo", l_url_userinfo},
-  {NULL, NULL}
-};
-
-
 /**
  * Register functions to lua_State.
  */
@@ -408,12 +393,6 @@ LUALIB_API int luaopen_hyperparser(lua_State* L) {
   lua_pushvalue(L, -1);
   lua_setfield(L, -2, "__index");
   luaL_register(L, NULL, hyperlib_m);
-
-  /* Metatable for url parser */
-  luaL_newmetatable(L, UrlParserUdataName);
-  lua_pushvalue(L, -1);
-  lua_setfield(L, -2, "__index");
-  luaL_register(L, NULL, urlparser_m);
 
   /* Main functions */
   lua_newtable(L);
