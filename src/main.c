@@ -103,6 +103,8 @@ static int l_http_cb(http_parser* p, const char* type) {
   if (! lua_isnoneornil(L, -1)) {
     luaL_checktype(L, -1, LUA_TFUNCTION);
     lua_call(L, 0, 0);
+  } else {
+    lua_pop(L, 1);
   }
   
   return 0;
@@ -287,17 +289,17 @@ static int l_parsergc(lua_State* L) {
   return 0;
 }
 
-#define hasField(u, field) ((u)->field_set && (1 << (field)))
+inline int hasField(struct http_parser_url *u, enum http_parser_url_fields field) {
+  return u->field_set & (1 << field);
+}
 
-inline int checkField(lua_State *L, const char* url, const struct http_parser_url *u, enum http_parser_url_fields field) {
+inline int checkField(lua_State *L, const char* url, struct http_parser_url *u, enum http_parser_url_fields field) {
   if (hasField(u, field)) {
     const uint16_t offset = u->field_data[field].off;
     const uint16_t len = u->field_data[field].len;
     const char* s = url + offset;
-    if (len > 0) {
-      lua_pushlstring(L, s, len);
-      return 1;
-    }
+    lua_pushlstring(L, s, len);
+    return 1;
   }
   return 0;
 }
@@ -308,41 +310,46 @@ static int l_parse_url(lua_State* L) {
   int isconnect = 0;
   if (lua_isboolean(L, 2)) {
     isconnect = lua_toboolean(L, 2);
+    lua_pop(L, 1);
   }
 
-  lua_settop(L, 0);
-
   struct http_parser_url u;
-  http_parser_parse_url(buf, len, isconnect, &u);
+  int ret = http_parser_parse_url(buf, len, isconnect, &u);
+
+  if (ret != 0) {
+    lua_pushnil(L);
+    return 1;
+  }
+
   lua_newtable(L);
 
   if (hasField(&u, UF_PORT) && u.port) {
     lua_pushnumber(L, u.port);
-    lua_setfield(L, 1, "port");
+    lua_setfield(L, 2, "port");
   }
 
   if (checkField(L, buf, &u, UF_SCHEMA)) {
-    lua_setfield(L, 1, "schema");
+    lua_setfield(L, 2, "schema");
   }
 
   if (checkField(L, buf, &u, UF_HOST)) {
-    lua_setfield(L, 1, "host");
+    lua_setfield(L, 2, "host");
   }
 
   if (checkField(L, buf, &u, UF_PATH)) {
-    lua_setfield(L, 1, "path");
+    lua_setfield(L, 2, "path");
   }
 
   if (checkField(L, buf, &u, UF_QUERY)) {
-    lua_setfield(L, 1, "query");
+    lua_setfield(L, 2, "query");
   }
 
   if (checkField(L, buf, &u, UF_FRAGMENT)) {
-    lua_setfield(L, 1, "fragment");
+    lua_setfield(L, 2, "fragment");
   }
 
   if (checkField(L, buf, &u, UF_USERINFO)) {
-    lua_setfield(L, 1, "userinfo");
+    lua_setfield(L, 2, "userinfo");
   }
 
   return 1;
