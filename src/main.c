@@ -74,17 +74,9 @@ static int l_parsertostring(lua_State* L) {
   return 1;
 }
 
-static void l_push_callback(lua_State* L, http_parser* p, const char* type) {
-  pushCallbacks(L);
-  lua_pushlightuserdata(L, p);
-  lua_gettable(L, -2);
-  lua_getfield(L, -1, type);
-}
-
 static int l_http_data_cb(http_parser* p, const char *at, size_t length, const char* type) {
-  parser_context* ctx = (parser_context*) p->data;
-  lua_State* L = ctx->L;
-  l_push_callback(L, p, type);
+  lua_State* L = (lua_State*) p->data;
+  lua_getfield(L, -1, type);
 
   if (! lua_isnoneornil(L, -1)) {
     luaL_checktype(L, -1, LUA_TFUNCTION);
@@ -96,15 +88,12 @@ static int l_http_data_cb(http_parser* p, const char *at, size_t length, const c
 }
 
 static int l_http_cb(http_parser* p, const char* type) {
-  parser_context* ctx = (parser_context*) p->data;
-  lua_State* L = ctx->L;
-  l_push_callback(L, p, type);
+  lua_State* L = (lua_State*) p->data;
+  lua_getfield(L, -1, type);
   
   if (! lua_isnoneornil(L, -1)) {
     luaL_checktype(L, -1, LUA_TFUNCTION);
     lua_call(L, 0, 0);
-  } else {
-    lua_pop(L, 1);
   }
   
   return 0;
@@ -143,63 +132,11 @@ static int l_body(http_parser* p, const char *at, size_t length) {
 }
 
 static int l_create(lua_State* L, int type) {
-  luaL_checktype(L, 1, LUA_TTABLE); // settings table
-
-  // Create http_parser
   http_parser* p = lua_newuserdata(L, sizeof(http_parser));
   http_parser_init(p, type);
   luaL_getmetatable(L, ParserUDataName);
   lua_setmetatable(L, -2);
 
-  // store settings in HyperParserCallbacksName[*p]
-  pushCallbacks(L);
-  lua_pushlightuserdata(L, p); // push key
-  lua_pushvalue(L, 1); // push settings table - value
-  lua_settable(L, -3); // set the field of HyperParserCallbacksName table
-  lua_pop(L, 1); // pop the callbacks table
-  
-  // Parse settings callbacks
-  struct http_parser_settings* settings = (struct http_parser_settings*) malloc(sizeof(struct http_parser_settings));
-  settings->on_message_begin = NULL;
-  settings->on_status_complete = NULL;
-  settings->on_url = NULL;
-  settings->on_header_field = NULL;
-  settings->on_header_value = NULL;
-  settings->on_headers_complete = NULL;
-  settings->on_body = NULL;
-  settings->on_message_complete = NULL;
-
-  lua_pushnil(L); // the first key
-  while(lua_next(L, 1) != 0) {
-    lua_pop(L, 1); /* pops value */
-    const char* key = lua_tostring(L, -1);
-    
-    if (strncmp(key, "msgbegin", 9) == 0)
-      settings->on_message_begin = l_msgbegin;
-    else if (strncmp(key, "url", 4) == 0)
-      settings->on_url = l_url;
-    else if (strncmp(key, "headerfield", 12) == 0)
-      settings->on_header_field = l_headerfield;
-    else if (strncmp(key, "headervalue", 12) == 0)
-      settings->on_header_value = l_headervalue;
-    else if (strncmp(key, "headerscomplete", 16) == 0)
-      settings->on_headers_complete = l_headerscomplete;
-    else if (strncmp(key, "body", 5) == 0)
-      settings->on_body = l_body;
-    else if (strncmp(key, "msgcomplete", 12) == 0)
-      settings->on_message_complete = l_msgcomplete;
-    else if (strncmp(key, "statuscomplete", 15) == 0)
-      settings->on_status_complete = l_statuscomplete;
-    else
-      return luaL_error(L, "Callback '%s' is not available (misspelled name?)", key);
-  }
-
-  parser_context* ctx = (parser_context*) malloc(sizeof(parser_context));
-  ctx->L = L;
-  ctx->settings = settings;
-  p->data = ctx;
-
-  lua_pushvalue(L, 2); // push the http_parser userdata
   return 1;
 }
 
@@ -215,9 +152,48 @@ static int l_execute(lua_State* L) {
   http_parser* p = (http_parser*)luaL_checkudata(L, 1, ParserUDataName);
   size_t len = 0;
   const char *data = luaL_checklstring(L, 2, &len);
-  parser_context* ctx = (parser_context*) p->data;
+  luaL_checktype(L, 3, LUA_TTABLE);
 
-  size_t nparsed = http_parser_execute(p, ctx->settings, data, len);
+  // ===========
+  // Parse settings callbacks
+  struct http_parser_settings settings;
+  settings.on_message_begin = NULL;
+  settings.on_status_complete = NULL;
+  settings.on_url = NULL;
+  settings.on_header_field = NULL;
+  settings.on_header_value = NULL;
+  settings.on_headers_complete = NULL;
+  settings.on_body = NULL;
+  settings.on_message_complete = NULL;
+
+  lua_pushnil(L); // the first key
+  while(lua_next(L, 3) != 0) {
+    lua_pop(L, 1); // Pop the value, keep key for the next iteration.
+    const char* key = lua_tostring(L, -1);
+    
+    if (strncmp(key, "msgbegin", 9) == 0)
+      settings.on_message_begin = l_msgbegin;
+    else if (strncmp(key, "url", 4) == 0)
+      settings.on_url = l_url;
+    else if (strncmp(key, "headerfield", 12) == 0)
+      settings.on_header_field = l_headerfield;
+    else if (strncmp(key, "headervalue", 12) == 0)
+      settings.on_header_value = l_headervalue;
+    else if (strncmp(key, "headerscomplete", 16) == 0)
+      settings.on_headers_complete = l_headerscomplete;
+    else if (strncmp(key, "body", 5) == 0)
+      settings.on_body = l_body;
+    else if (strncmp(key, "msgcomplete", 12) == 0)
+      settings.on_message_complete = l_msgcomplete;
+    else if (strncmp(key, "statuscomplete", 15) == 0)
+      settings.on_status_complete = l_statuscomplete;
+    else
+      return luaL_error(L, "Callback '%s' is not available (misspelled name?)", key);
+  }
+  // ==============
+
+  p->data = L;
+  size_t nparsed = http_parser_execute(p, &settings, data, len);
   lua_pushnumber(L, nparsed);
   
   return 1;
@@ -275,18 +251,6 @@ static int l_shouldkeepalive_a(lua_State* L) {
   int shouldKeepAlive = http_should_keep_alive(p);
   lua_pushboolean(L, shouldKeepAlive);
   return 1;
-}
-
-static int l_parsergc(lua_State* L) {
-  http_parser* p = (http_parser*)luaL_checkudata(L, 1, ParserUDataName);
-  parser_context* ctx = (parser_context*) p->data;
-  free(ctx->settings);
-  free(ctx);
-  pushCallbacks(L);
-  lua_pushlightuserdata(L, p);
-  lua_pushnil(L);
-  lua_settable(L, -3);
-  return 0;
 }
 
 inline int hasField(struct http_parser_url *u, enum http_parser_url_fields field) {
@@ -381,21 +345,8 @@ static const struct luaL_Reg hyperlib_m [] = {
  * Register functions to lua_State.
  */
 LUALIB_API int luaopen_hyperparser(lua_State* L) {
-  lua_newtable(L);
-  lua_newtable(L);
-  lua_setfield(L, -2, HyperParserCallbacksName);
-  lua_replace(L, LUA_ENVIRONINDEX);
-  
   /* Metatable for http parser */
   luaL_newmetatable(L, ParserUDataName);
-
-  lua_pushstring(L, "__mode");
-  lua_pushstring(L, "k");
-  lua_settable(L, -3);
-  
-  lua_pushstring(L, "__gc");
-  lua_pushcfunction(L, l_parsergc);
-  lua_settable(L, -3);
   
   lua_pushvalue(L, -1);
   lua_setfield(L, -2, "__index");

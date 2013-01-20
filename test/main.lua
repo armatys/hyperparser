@@ -13,10 +13,10 @@ local settings = {
     io.write(" -> " .. a .. "\n")
   end
 }
-local parser = hyperparser.request(settings) -- or hyperparser.response(settings)
+local parser = hyperparser.request() -- or hyperparser.response()
 local req = "GET /index/?key=val&key2=val2 HTTP/1.1\r\nHost: www.example.com\r\nContent-Length: 12\r\n\r\nHello world!"
 
-parser:execute(req)
+parser:execute(req, settings)
 
 local url = "http://www.example.com:80/main?name=123#part"
 local uparser = hyperparser.parseurl(url)
